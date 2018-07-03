@@ -3,6 +3,7 @@ package com.backbase.website.regression;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -30,8 +32,8 @@ public class BaseClass {
 	// we can have different webdrivertype, like ie, firefox, htmlunit.
 	// also we can get these types from a property file, for now I am just using it from here
 	public static WebDriver driver = null;
-	String webdriverType = "chrome";
 	private FieldType fieldType;
+	protected static BackbaseProperties props;
 
 	public enum FieldType {
 		/** the field allows input (may be updated) */
@@ -50,12 +52,24 @@ public class BaseClass {
 	public FieldType getFieldType() {
 		return fieldType;
 	}
-
+	
 	@BeforeClass
-	public static void setWebdriver() {
+	public static void baseClassSetUp() {
+
+	      // although called before each test case class, only need to initialize first time called
+	      if (props == null) {
+	         props = new BackbaseProperties();
+
+	         // load defaults first (false = required)
+	         props.loadProperties("uitest.properties", false);
+	      }
+	   }
+
+	@Before
+	public static void baseSetUp() {
 		// set the system property for finding the chrome driver executable
 		System.out.println(System.getProperty("user.home"));
-		System.setProperty(ChromeDriverService.CHROME_DRIVER_EXE_PROPERTY, System.getProperty("user.home")+"/Downloads/chromedriver_win32/chromedriver37.exe");
+		System.setProperty(ChromeDriverService.CHROME_DRIVER_EXE_PROPERTY, getChromeDriverLocation());
 
 		driver = new ChromeDriver();
 		driver.manage().window().maximize();
@@ -289,6 +303,33 @@ public class BaseClass {
 
 		return disabled;
 	}
+	
+	private static String getChromeDriverLocation() {
+	      String chromeDriverLocation = props.findProperty("chromedriver.location");
+
+	      if (chromeDriverLocation == null) {
+	         InputStream istream = null;
+	         OutputStream ostream = null;
+
+	         try {
+	            chromeDriverLocation = "target/temp/" + getDefaultUser() + "/chromedriver.exe";
+	         }
+	          finally {
+	            IOUtils.closeQuietly(ostream);
+	            IOUtils.closeQuietly(istream);
+	         }
+	      }
+
+	      return chromeDriverLocation;
+	   }
+	
+	/**
+	    * Returns the default login user as specified in the configuration file.
+	    */
+	   public static String getDefaultUser() {
+		  String effectiveDefaultUser = props.getRequiredProperty("defaultUser");
+	      return effectiveDefaultUser;
+	   }
 
 	@After
 	public void baseTearDown() {
